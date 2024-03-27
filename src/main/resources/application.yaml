@@ -1,0 +1,48 @@
+server:
+  port: "${APP_PORT:3000}"
+  shutdown: graceful
+
+spring:
+  devtools:
+    livereload:
+      enabled: true
+    restart:
+      additional-exclude: "test/**"
+  application:
+    name: "hateoas"
+  main:
+    banner-mode: off
+  webflux:
+    problemdetails:
+      enabled: true
+  h2:
+    console:
+      path: "/h2"
+      enabled: true
+  r2dbc:
+#    url: "r2dbc:h2:file:///./tmp/hateoas;SCHEMA=PUBLIC;DB_CLOSE_DELAY=-1;"
+    url: "r2dbc:h2:mem:///~/db/hateoas"
+    username: "sa"
+    password: ""
+  flyway:
+    enabled: true
+#    url: "jdbc:h2:file:./tmp/hateoas"
+    url: "jdbc:h2:mem:~/db/hateoas"
+    user: "${spring.r2dbc.username}"
+    password: "${spring.r2dbc.password}"
+#    default-schema: "PUBLIC"
+    table: "migrations"
+    locations: "classpath:migrations"
+    sql-migration-prefix: "0"
+    sql-migration-separator: "-"
+    connect-retries: 3
+    connect-retries-interval: "15s"
+    baseline-on-migrate: true
+    fail-on-missing-locations: true
+
+management:
+  endpoints:
+    enabled-by-default: false
+  endpoint:
+    health:
+      enabled: true

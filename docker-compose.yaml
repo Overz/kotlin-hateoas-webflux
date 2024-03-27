@@ -1,0 +1,17 @@
+version: '3.9'
+
+volumes:
+  postgres:
+    name: "postgres-hateoas"
+
+networks:
+  app:
+    name: "hateoas"
+
+services:
+
+  postgres:
+    image: postgres:16
+    restart: always
+    hostname: "postgres-srv"
+
