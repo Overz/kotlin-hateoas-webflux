@@ -1,3 +1,5 @@
+debug: true
+
 server:
   port: "${APP_PORT:3000}"
   shutdown: graceful
@@ -5,32 +7,30 @@ server:
 spring:
   devtools:
     livereload:
-      enabled: true
+      enabled: ${debug}
     restart:
       additional-exclude: "test/**"
   application:
-    name: "hateoas"
+    name: "@project.artifactId@"
   main:
     banner-mode: off
   webflux:
     problemdetails:
       enabled: true
-  h2:
-    console:
-      path: "/h2"
-      enabled: true
+  docker:
+    compose:
+      enabled: ${debug}
+      file: "docker-compose.yaml"
   r2dbc:
-#    url: "r2dbc:h2:file:///./tmp/hateoas;SCHEMA=PUBLIC;DB_CLOSE_DELAY=-1;"
-    url: "r2dbc:h2:mem:///~/db/hateoas"
-    username: "sa"
-    password: ""
+    url: "r2dbc:${DB_TYPE}://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    username: "${DB_USER}"
+    password: "${DB_PASSWORD}"
   flyway:
     enabled: true
-#    url: "jdbc:h2:file:./tmp/hateoas"
-    url: "jdbc:h2:mem:~/db/hateoas"
-    user: "${spring.r2dbc.username}"
-    password: "${spring.r2dbc.password}"
-#    default-schema: "PUBLIC"
+    url: "jdbc:${DB_TYPE}://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    user: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    default-schema: "${DB_SCHEMA}"
     table: "migrations"
     locations: "classpath:migrations"
     sql-migration-prefix: "0"
@@ -39,10 +39,16 @@ spring:
     connect-retries-interval: "15s"
     baseline-on-migrate: true
     fail-on-missing-locations: true
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
 
 management:
   endpoints:
     enabled-by-default: false
   endpoint:
     health:
+      enabled: true
+    prometheus:
       enabled: true

@@ -14,4 +14,18 @@ services:
     image: postgres:16
     restart: always
     hostname: "postgres-srv"
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: "1536Mb"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    networks:
+      app:
 

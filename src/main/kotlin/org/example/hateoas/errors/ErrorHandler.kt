@@ -5,7 +5,6 @@ import org.springframework.http.*
 import org.springframework.validation.FieldError
 import org.springframework.validation.method.MethodValidationException
 import org.springframework.web.ErrorResponse
-import org.springframework.web.ErrorResponseException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.bind.support.WebExchangeBindException
@@ -16,10 +15,13 @@ import reactor.core.publisher.Mono
 import java.net.URI
 import java.time.LocalDateTime
 import java.util.*
+import java.util.logging.Level
+import java.util.logging.Logger
 
 @RestControllerAdvice
 class ErrorHandler : ResponseEntityExceptionHandler() {
 	companion object {
+		val log: Logger = Logger.getLogger(ErrorHandler::class.java.simpleName)
 		private const val DEFAULT_MSG = "Erro de validação"
 		private const val TYPE = "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/"
 	}
@@ -43,6 +45,7 @@ class ErrorHandler : ResponseEntityExceptionHandler() {
 		var locale = Locale.getDefault()
 		if (exchange != null) {
 			locale = exchange.localeContext.locale
+			builder.instance(URI.create(exchange.request.path.value()))
 		}
 
 		if (errors != null) {
@@ -69,8 +72,10 @@ class ErrorHandler : ResponseEntityExceptionHandler() {
 			InternalServerException::class
 		]
 	)
-	fun handleException(ex: Exception): Mono<ResponseEntity<Any>> =
-		toView(INTERNAL_ERROR_TEMPLATE, ex, null, null)
+	fun handleException(ex: Exception): Mono<ResponseEntity<Any>> {
+		log.log(Level.SEVERE) { "Erro interno não capturado: \n$ex" }
+		return toView(INTERNAL_ERROR_TEMPLATE, ex, null, null)
+	}
 
 	override fun handleMethodNotAllowedException(
 		ex: MethodNotAllowedException,
@@ -83,15 +88,6 @@ class ErrorHandler : ResponseEntityExceptionHandler() {
 		exchange,
 		mapOf("requested" to ex.httpMethod, "allowed" to ex.supportedMethods),
 	)
-
-	override fun handleNotAcceptableStatusException(
-		ex: NotAcceptableStatusException,
-		headers: HttpHeaders,
-		status: HttpStatusCode,
-		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> {
-		TODO("fazer")
-	}
 
 	override fun handleUnsupportedMediaTypeStatusException(
 		ex: UnsupportedMediaTypeStatusException,
@@ -170,33 +166,6 @@ class ErrorHandler : ResponseEntityExceptionHandler() {
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(BAD_REQUEST_TEMPLATE, ex, exchange)
-
-	override fun handleServerErrorException(
-		ex: ServerErrorException,
-		headers: HttpHeaders,
-		status: HttpStatusCode,
-		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> {
-		TODO("fazer")
-	}
-
-	override fun handleResponseStatusException(
-		ex: ResponseStatusException,
-		headers: HttpHeaders,
-		status: HttpStatusCode,
-		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> {
-		TODO("fazer")
-	}
-
-	override fun handleErrorResponseException(
-		ex: ErrorResponseException,
-		headers: HttpHeaders,
-		status: HttpStatusCode,
-		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> {
-		TODO("fazer")
-	}
 
 	override fun handleMethodValidationException(
 		ex: MethodValidationException,
