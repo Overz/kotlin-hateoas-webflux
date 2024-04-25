@@ -1,0 +1,370 @@
+openapi: "3.0.3"
+
+info:
+  title: "HATEOAS with WebFlux using Kotlin"
+  description: |
+    An API developed using WebFlux with Kotlin
+  version: "0.0.1"
+
+servers:
+  - url: "http://localhost:3000"
+    description: "development server"
+
+tags:
+  - name: book
+    description: |
+      Requests to change Book data
+
+paths:
+  /book/{id}:
+    put:
+      summary: "Update content of Book"
+      operationId: "put_book"
+      tags:
+        - "book"
+      parameters:
+        - $ref: "#/components/parameters/BookIdParameter"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Book"
+          application/xml:
+            schema:
+              $ref: "#/components/schemas/Book"
+          application/yaml:
+            schema:
+              $ref: "#/components/schemas/Book"
+      responses:
+        "204":
+          description: "Nothing to return when success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Void"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Void"
+            application/yaml:
+              schema:
+                $ref: "#/components/schemas/Void"
+
+    patch:
+      summary: "Partial update a book content"
+      operationId: "patch_book"
+      tags:
+        - "book"
+      parameters:
+        - $ref: "#/components/parameters/BookIdParameter"
+      requestBody:
+        description: |
+          All properties are optionals
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Book"
+          application/xml:
+            schema:
+              $ref: "#/components/schemas/Book"
+          application/yaml:
+            schema:
+              $ref: "#/components/schemas/Book"
+      responses:
+        "204":
+          description: "Nothing to return when success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Void"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Void"
+            application/yaml:
+              schema:
+                $ref: "#/components/schemas/Void"
+
+    delete:
+      summary: "Delete a book"
+      operationId: "delete_book"
+      tags:
+        - "book"
+      parameters:
+        - $ref: "#/components/parameters/BookIdParameter"
+      responses:
+        "200":
+          description: "Nothing to return when success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Void"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Void"
+            application/yaml:
+              schema:
+                $ref: "#/components/schemas/Void"
+
+    get:
+      summary: "Find a single book"
+      operationId: "get_single_book"
+      tags:
+        - "book"
+      parameters:
+        - $ref: "#/components/parameters/BookIdParameter"
+      responses:
+        "200":
+          description: "Nothing to return when success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Book"
+            application/yaml:
+              schema:
+                $ref: "#/components/schemas/Book"
+
+  /book:
+    post:
+      summary: "POST book"
+      operationId: "post"
+      tags:
+        - "book"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Book"
+          application/xml:
+            schema:
+              $ref: "#/components/schemas/Book"
+          application/yaml:
+            schema:
+              $ref: "#/components/schemas/Book"
+        required: true
+      responses:
+        "201":
+          description: "Created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Book"
+            application/yaml:
+              schema:
+                $ref: "#/components/schemas/Book"
+
+    get:
+      summary: "Filtered Pagination of Book"
+      operationId: "get_book_pagination"
+      tags:
+        - "book"
+      parameters:
+        - $ref: "#/components/parameters/BookNameQuery"
+        - $ref: "#/components/parameters/BookAuthorQuery"
+        - $ref: "#/components/parameters/BookDescriptionQuery"
+        - $ref: "#/components/parameters/BookCreatedAtStartQuery"
+        - $ref: "#/components/parameters/BookCreatedAtEndQuery"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pagination"
+            application/xml:
+              schema:
+                $ref: "#/components/schemas/Pagination"
+            application/yaml:
+              schema:
+                $ref: "#/components/schemas/Pagination"
+
+components:
+
+  responses:
+    400:
+      description: "Erro de validação pelo client"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ErrorViewSchema"
+          examples:
+            BadRequestErrorExample_1:
+              $ref: "#/components/examples/BadRequestErrorExample_1"
+            BadRequestErrorExample_2:
+              $ref: "#/components/examples/BadRequestErrorExample_2"
+            ConstraintViolationExceptionExample_1:
+              $ref: "#/components/examples/ConstraintViolationExceptionExample_1"
+            HttpMessageNotReadableExceptionExample_1:
+              $ref: "#/components/examples/HttpMessageNotReadableExceptionExample_1"
+            MethodArgumentNotValidExceptionExample_1:
+              $ref: "#/components/examples/MethodArgumentNotValidExceptionExample_1"
+            MissingServletRequestParameterExceptionExample_1:
+              $ref: "#/components/examples/MissingServletRequestParameterExceptionExample_1"
+            MissingPathVariableExceptionExample_1:
+              $ref: "#/components/examples/MissingPathVariableExceptionExample_1"
+
+  parameters:
+    BookIdParameter:
+      in: "path"
+      name: "id"
+      required: true
+      description: |
+        ID used to find a book
+      schema:
+        type: "integer"
+        format: "int32"
+        example: "123"
+
+    BookNameQuery:
+      in: "query"
+      name: "name"
+      required: false
+      description: |
+        A Filtered param-query used to search book's
+      schema:
+        type: "string"
+        example: "my favorite book"
+
+    BookAuthorQuery:
+      in: "query"
+      name: "author"
+      required: false
+      description: |
+        A Filtered query-param used to search book's
+      schema:
+        type: "string"
+        example: "my favorite author"
+
+    BookDescriptionQuery:
+      in: "query"
+      name: "description"
+      required: false
+      description: |
+        A Filtered query-param used to search book's
+      schema:
+        type: "string"
+        example: "a book description"
+
+    BookCreatedAtStartQuery:
+      in: "query"
+      name: "created_at_start"
+      required: false
+      description: |
+        A Filtered query-param used to search book's
+      schema:
+        type: "string"
+        format: "date"
+        example: "2023-01-01"
+
+    BookCreatedAtEndQuery:
+      in: "query"
+      name: "created_at_end"
+      required: false
+      description: |
+        A Filtered query-param used to search book's
+      schema:
+        type: "string"
+        format: "date"
+        example: "2023-12-31"
+
+  schemas:
+
+    Book:
+      type: "object"
+      required:
+        - "name"
+        - "author"
+        - "description"
+      properties:
+        id:
+          type: "integer"
+          format: "int32"
+        name:
+          type: "string"
+        author:
+          type: "string"
+        description:
+          type: "string"
+        created_at:
+          type: "string"
+          format: "date"
+        updated_at:
+          type: "string"
+          format: "date"
+
+    Links:
+      type: "object"
+      required:
+        - "rel"
+        - "href"
+      properties:
+        rel:
+          type: "string"
+        href:
+          type: "string"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: "integer"
+        pageSize:
+          type: "integer"
+        totalRecords:
+          type: "integer"
+        data:
+          type: "array"
+          items:
+            type: "object"
+            description: "Pattern for pagination for this application"
+        links:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Links"
+
+    ErrorViewSchema:
+      title: "Error"
+      description: |
+        RFC7807, padronização de qualquer erro retornado pela API.
+      type: "object"
+      required:
+        - "result"
+      properties:
+        result:
+          type: "object"
+          required:
+            - "type"
+            - "title"
+            - "status"
+            - "detail"
+            - "timestamp"
+          properties:
+            type:
+              type: "string"
+              format: "uri"
+            title:
+              type: "string"
+            status:
+              type: "integer"
+            detail:
+              type: "string"
+            timestamp:
+              type: "string"
+              pattern: "date-time"
+            erros:
+              type: "array"
+              description: |
+                Considerar tipo `any`.
+
+                Propriedades adicionais para esclarecer o erro.
+              items:
+                type: "object"
+
+    Void:
+      type: "object"
+      properties: { }

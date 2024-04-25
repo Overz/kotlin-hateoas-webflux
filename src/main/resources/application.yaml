@@ -17,6 +17,10 @@ spring:
   webflux:
     problemdetails:
       enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
   docker:
     compose:
       enabled: ${debug}
@@ -39,10 +43,17 @@ spring:
     connect-retries-interval: "15s"
     baseline-on-migrate: true
     fail-on-missing-locations: true
-  jackson:
-    default-property-inclusion: non_null
-    deserialization:
-      fail-on-unknown-properties: false
+
+# https://springdoc.org/
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    disable-swagger-default-url: true
+    urls:
+      - name: "@project.name@ - V1"
+        url: "/swagger-v1.yaml"
 
 management:
   endpoints:

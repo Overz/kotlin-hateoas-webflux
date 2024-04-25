@@ -9,6 +9,7 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.relational.core.query.Criteria
+import org.springframework.data.relational.core.query.Query
 import org.springframework.format.annotation.DateTimeFormat
 import java.io.Serializable
 import java.time.LocalDate
@@ -92,4 +93,8 @@ data class BookPagination(
 			created_at_end?.let { Criteria.where(Book.DT_CREATED_AT).lessThanOrEquals(it) }
 		)
 	)
+
+	override fun toQuery(withPagination: Boolean?): Query =
+		if (withPagination == true) Query.query(buildCriteria()).with(toPageRequest())
+		else Query.query(buildCriteria())
 }

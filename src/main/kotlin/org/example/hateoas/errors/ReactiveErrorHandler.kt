@@ -1,7 +1,12 @@
 package org.example.hateoas.errors
 
-import org.example.hateoas.errors.ErrorHandler.TemplateError.*
-import org.springframework.http.*
+import org.example.hateoas.errors.ReactiveErrorHandler.TemplateError.*
+import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.HttpStatusCode
+import org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON
+import org.springframework.http.ResponseEntity
 import org.springframework.validation.FieldError
 import org.springframework.validation.method.MethodValidationException
 import org.springframework.web.ErrorResponse
@@ -15,23 +20,21 @@ import reactor.core.publisher.Mono
 import java.net.URI
 import java.time.LocalDateTime
 import java.util.*
-import java.util.logging.Level
-import java.util.logging.Logger
 
 @RestControllerAdvice
-class ErrorHandler : ResponseEntityExceptionHandler() {
+class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 	companion object {
-		val log: Logger = Logger.getLogger(ErrorHandler::class.java.simpleName)
+		private val log = LoggerFactory.getLogger(ReactiveErrorHandler::class.java.simpleName)
 		private const val DEFAULT_MSG = "Erro de validação"
 		private const val TYPE = "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/"
 	}
 
-	private fun toView(
+	private fun responseEntity(
 		t: TemplateError,
 		ex: Exception,
 		exchange: ServerWebExchange?,
-		errors: Any?,
-	): Mono<ResponseEntity<Any>> {
+		errors: Any?
+	): ResponseEntity<Any> {
 		val detail = (t.detail ?: if (ex is ErrorResponse) ex.body.detail else ex.message)!!
 		val builder = ErrorResponse
 			.builder(ex, t.status, detail)
@@ -42,29 +45,32 @@ class ErrorHandler : ResponseEntityExceptionHandler() {
 			.type(URI.create(TYPE.plus(t.status.value())))
 			.property("timestamp", LocalDateTime.now())
 
+		if (errors != null) {
+			builder.property("errors", errors)
+		}
+
 		var locale = Locale.getDefault()
 		if (exchange != null) {
 			locale = exchange.localeContext.locale
 			builder.instance(URI.create(exchange.request.path.value()))
 		}
 
-		if (errors != null) {
-			builder.property("errors", errors)
-		}
-
-		return Mono.just(
-			ResponseEntity
-				.status(t.status)
-				.contentType(MediaType.APPLICATION_PROBLEM_JSON)
-				.body(builder.build().updateAndGetBody(super.getMessageSource(), locale))
-		)
+		val body = builder.build().updateAndGetBody(messageSource, locale)
+		return ResponseEntity.status(t.status).contentType(APPLICATION_PROBLEM_JSON).body(body)
 	}
 
 	private fun toView(
 		t: TemplateError,
 		ex: Exception,
+		exchange: ServerWebExchange?,
+		errors: Any?,
+	): Mono<ResponseEntity<Any>> = Mono.just(responseEntity(t, ex, exchange, errors))
+
+	private fun toView(
+		t: TemplateError,
+		ex: Exception,
 		exchange: ServerWebExchange
-	) = toView(t, ex, exchange, null)
+	): Mono<ResponseEntity<Any>> = toView(t, ex, exchange, null)
 
 	@ExceptionHandler(
 		value = [
@@ -72,9 +78,9 @@ class ErrorHandler : ResponseEntityExceptionHandler() {
 			InternalServerException::class
 		]
 	)
-	fun handleException(ex: Exception): Mono<ResponseEntity<Any>> {
-		log.log(Level.SEVERE) { "Erro interno não capturado: \n$ex" }
-		return toView(INTERNAL_ERROR_TEMPLATE, ex, null, null)
+	fun handleCustomException(ex: Exception): ResponseEntity<Any> {
+		log.error("Erro interno não capturado", ex)
+		return responseEntity(INTERNAL_ERROR_TEMPLATE, ex, null, null)
 	}
 
 	override fun handleMethodNotAllowedException(

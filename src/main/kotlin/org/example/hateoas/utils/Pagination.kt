@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.data.domain.Sort.*
 import org.springframework.data.relational.core.query.Criteria
+import org.springframework.data.relational.core.query.Query
 import org.springframework.hateoas.Link
 import java.io.Serializable
 
@@ -37,6 +38,7 @@ abstract class PaginationRequest(
 	 */
 	abstract fun getMappedFields(): Map<String, String>
 	abstract fun buildCriteria(): Criteria
+	abstract fun toQuery(withPagination: Boolean? = false): Query
 
 	fun toPageRequest() = PageRequest.of(page, pageSize, getSorters())
 

@@ -1,17 +1,16 @@
 package org.example.hateoas
 
 import jakarta.validation.Valid
-import org.example.hateoas.utils.CustomMediaType
+import org.example.hateoas.errors.InternalServerException
+import org.example.hateoas.utils.CustomMediaType.APPLICATION_YAML_VALUE
 import org.example.hateoas.utils.PaginationResult
-import org.springframework.hateoas.EntityModel
 import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo
 import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn
-import org.springframework.hateoas.server.reactive.ReactiveRepresentationModelAssembler
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
+import org.springframework.http.MediaType.APPLICATION_JSON_VALUE
+import org.springframework.http.MediaType.APPLICATION_XML_VALUE
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
-import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 
 @Validated
@@ -21,79 +20,42 @@ class Controller(private val service: Service) {
 
 	@ResponseStatus(HttpStatus.CREATED)
 	@PostMapping(
-		consumes = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		],
-		produces = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		]
+		consumes = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE],
+		produces = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE]
 	)
-	fun post(@RequestBody @Valid body: Mono<Book>) = body.flatMap { dto -> service.create(dto) }
+	fun post(@RequestBody @Valid b: Book) = service.create(b)
 
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@PutMapping(
-		consumes = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-
-			CustomMediaType.APPLICATION_YAML_VALUE
-		],
-		produces = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		]
+		path = ["/{id}"],
 	)
-	fun put(@RequestBody @Valid body: Mono<Book>) = body.flatMap { service.update(it) }.then()
+	fun put(@PathVariable("id") id: Int, @RequestBody @Valid b: Book) = service.update(id, b).then()
 
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@PatchMapping(
-		consumes = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		],
-		produces = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		]
+		path = ["/{id}"],
+		consumes = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE],
+		produces = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE]
 	)
-	fun patch(@RequestBody body: Mono<Book>) = body.flatMap { service.update(it) }.then()
+	fun patch(@PathVariable("id") id: Int, @RequestBody b: Book) = service.update(id, b).then()
 
 	@ResponseStatus(HttpStatus.OK)
 	@GetMapping(
 		path = ["/{id}"],
-		produces = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		]
+		produces = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE]
 	)
-	fun get(@PathVariable("id") id: Int) = service.get(id).map { it }
+	fun get(@PathVariable("id") id: Int) = service.get(id)
 
 	@ResponseStatus(HttpStatus.OK)
 	@DeleteMapping(
 		path = ["/{id}"],
-		produces = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		]
+		produces = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE]
 	)
 	fun delete(@PathVariable("id") id: Int) = service.delete(id)
 
 	@ResponseStatus(HttpStatus.OK)
 	@GetMapping(
-		produces = [
-			MediaType.APPLICATION_JSON_VALUE,
-			MediaType.APPLICATION_XML_VALUE,
-			CustomMediaType.APPLICATION_YAML_VALUE
-		]
+		produces = [APPLICATION_JSON_VALUE, APPLICATION_XML_VALUE, APPLICATION_YAML_VALUE]
 	)
 	fun get(@ModelAttribute @Valid pr: BookPagination): Mono<PaginationResult<Book>> =
 		service.list(pr)
@@ -104,14 +66,4 @@ class Controller(private val service: Service) {
 				Triple(it.t1, it.t2, data)
 			}
 			.flatMap { Mono.just(PaginationResult(pr.page, pr.pageSize, it.second, it.first, it.third)) }
-}
-
-class Teste : ReactiveRepresentationModelAssembler<Book, EntityModel<Book>> {
-	override fun toModel(entity: Book, exchange: ServerWebExchange): Mono<EntityModel<Book>> = Mono.just(
-		EntityModel.of(
-			entity,
-			linkTo(methodOn(Controller::class.java).get(entity.cdBook!!)).withSelfRel()
-		)
-	)
-
 }
