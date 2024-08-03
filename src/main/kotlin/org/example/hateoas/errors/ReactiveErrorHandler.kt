@@ -1,6 +1,6 @@
 package org.example.hateoas.errors
 
-import org.example.hateoas.errors.ReactiveErrorHandler.TemplateError.*
+import org.example.hateoas.utils.MapperUtils
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.validation.FieldError
 import org.springframework.validation.method.MethodValidationException
 import org.springframework.web.ErrorResponse
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.bind.support.WebExchangeBindException
@@ -25,8 +26,8 @@ import java.util.*
 class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 	companion object {
 		private val log = LoggerFactory.getLogger(ReactiveErrorHandler::class.java.simpleName)
-		private const val DEFAULT_MSG = "Erro de validação"
-		private const val TYPE = "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/"
+		private const val DEFAULT_MSG = "Validation error"
+		private val TYPE = URI.create("https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/")
 	}
 
 	private fun responseEntity(
@@ -35,6 +36,7 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		exchange: ServerWebExchange?,
 		errors: Any?
 	): ResponseEntity<Any> {
+		log.error("Mapping error, template: '{}'", t, ex)
 		val detail = (t.detail ?: if (ex is ErrorResponse) ex.body.detail else ex.message)!!
 		val builder = ErrorResponse
 			.builder(ex, t.status, detail)
@@ -42,7 +44,7 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 			.detailMessageCode(ErrorResponse.getDefaultDetailMessageCode(ex.javaClass, null))
 			.typeMessageCode(ErrorResponse.getDefaultTypeMessageCode(ex.javaClass))
 			.titleMessageCode(ErrorResponse.getDefaultTitleMessageCode(ex.javaClass))
-			.type(URI.create(TYPE.plus(t.status.value())))
+			.type(TYPE.resolve("" + t.status.value()))
 			.property("timestamp", LocalDateTime.now())
 
 		if (errors != null) {
@@ -72,16 +74,45 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(t, ex, exchange, null)
 
+	private fun mapFieldError(f: FieldError, cls: Class<*>? = null): Map<String, Any?> {
+		var name: String? = f.field
+		if (cls != null) {
+			val annotations = MapperUtils.getAnnotation(cls)
+			name = annotations.find { it.field.name.lowercase() == name!!.lowercase() }?.name
+		}
+
+		return mapOf(
+			"field" to name,
+			"message" to f.defaultMessage,
+			"value" to f.rejectedValue
+		)
+	}
+
 	@ExceptionHandler(
-		value = [
-			Exception::class,
-			InternalServerException::class
-		]
+		Exception::class,
+		InternalServerException::class
 	)
 	fun handleCustomException(ex: Exception): ResponseEntity<Any> {
-		log.error("Erro interno não capturado", ex)
-		return responseEntity(INTERNAL_ERROR_TEMPLATE, ex, null, null)
+		return responseEntity(TemplateError.INTERNAL_ERROR, ex, null, null)
 	}
+
+	@ExceptionHandler(NotFoundException::class)
+	fun handleNotFoundException(ex: NotFoundException):ResponseEntity<Any> {
+		return responseEntity(TemplateError.NOT_FOUND, ex, null, null)
+	}
+
+	@ExceptionHandler(MethodArgumentNotValidException::class)
+	fun handleMethodArgumentNotValidException(ex: MethodArgumentNotValidException): ResponseEntity<Any> =
+		responseEntity(
+			TemplateError.METHOD_ARGUMENT_NOT_VALID,
+			ex,
+			null,
+			ex.allErrors.map {
+				when (it) {
+					is FieldError -> mapFieldError(it, ex.parameter.parameterType)
+					else -> it.defaultMessage ?: DEFAULT_MSG
+				}
+			})
 
 	override fun handleMethodNotAllowedException(
 		ex: MethodNotAllowedException,
@@ -89,7 +120,7 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(
-		METHOD_NOT_ALLOWED_TEMPLATE,
+		TemplateError.METHOD_NOT_ALLOWED,
 		ex,
 		exchange,
 		mapOf("requested" to ex.httpMethod, "allowed" to ex.supportedMethods),
@@ -101,7 +132,7 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(
-		UNSUPPORTED_MEDIA_TYPE_TEMPLATE,
+		TemplateError.UNSUPPORTED_MEDIA_TYPE,
 		ex,
 		exchange,
 		mapOf(
@@ -115,7 +146,7 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		headers: HttpHeaders,
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> = toView(MISSING_REQUEST_VALUE_TEMPLATE, ex, exchange)
+	): Mono<ResponseEntity<Any>> = toView(TemplateError.MISSING_REQUEST_VALUE, ex, exchange)
 
 	override fun handleUnsatisfiedRequestParameterException(
 		ex: UnsatisfiedRequestParameterException,
@@ -123,7 +154,7 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(
-		MISSING_REQUEST_PARAMETER_TEMPLATE,
+		TemplateError.MISSING_REQUEST_PARAMETER,
 		ex,
 		exchange,
 		mapOf(
@@ -138,12 +169,12 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(
-		MISSING_REQUEST_VALUE_TEMPLATE,
+		TemplateError.MISSING_REQUEST_VALUE,
 		ex,
 		exchange,
 		ex.allErrors.map {
 			when (it) {
-				is FieldError -> mapOf("field" to it.field, "message" to it.defaultMessage)
+				is FieldError -> mapFieldError(it)
 				else -> it.defaultMessage ?: DEFAULT_MSG
 			}
 		}
@@ -155,12 +186,12 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(
-		MISSING_REQUEST_VALUE_TEMPLATE,
+		TemplateError.MISSING_REQUEST_VALUE,
 		ex,
 		exchange,
 		ex.allErrors.map {
 			when (it) {
-				is FieldError -> mapOf("field" to it.field, "message" to it.defaultMessage)
+				is FieldError -> mapFieldError(it)
 				else -> it.defaultMessage ?: DEFAULT_MSG
 			}
 		}
@@ -171,19 +202,19 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		headers: HttpHeaders,
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> = toView(BAD_REQUEST_TEMPLATE, ex, exchange)
+	): Mono<ResponseEntity<Any>> = toView(TemplateError.BAD_REQUEST, ex, exchange)
 
 	override fun handleMethodValidationException(
 		ex: MethodValidationException,
 		status: HttpStatus,
 		exchange: ServerWebExchange
 	): Mono<ResponseEntity<Any>> = toView(
-		BAD_REQUEST_TEMPLATE,
+		TemplateError.BAD_REQUEST,
 		ex,
 		exchange,
 		ex.allErrors.map {
 			when (it) {
-				is FieldError -> mapOf("field" to it.field, "message" to it.defaultMessage)
+				is FieldError -> mapFieldError(it)
 				else -> it.defaultMessage ?: DEFAULT_MSG
 			}
 		}
@@ -195,56 +226,56 @@ class ReactiveErrorHandler : ResponseEntityExceptionHandler() {
 		headers: HttpHeaders?,
 		status: HttpStatusCode,
 		exchange: ServerWebExchange
-	): Mono<ResponseEntity<Any>> = toView(INTERNAL_ERROR_TEMPLATE, ex, exchange)
+	): Mono<ResponseEntity<Any>> = toView(TemplateError.INTERNAL_ERROR, ex, exchange)
 
 	enum class TemplateError(
 		val title: String,
 		val detail: String?,
 		val status: HttpStatus
 	) {
-		BAD_REQUEST_TEMPLATE("Erro do Cliente", null, HttpStatus.BAD_REQUEST),
-		MISSING_REQUEST_VALUE_TEMPLATE(
-			"Violação de Constraint",
-			"Valores obrigatórios não foram informados",
+		BAD_REQUEST("Customer error", null, HttpStatus.BAD_REQUEST),
+		MISSING_REQUEST_VALUE(
+			"Constraint Violation",
+			"Mandatory values were not informed",
 			HttpStatus.BAD_REQUEST
 		),
-		HTTP_MESSAGE_NOT_READABLE_TEMPLATE(
-			"Requisição Não Processada",
-			"Não foi possível ler o conteúdo da requisição. Possível má formatação?",
+		HTTP_MESSAGE_NOT_READABLE(
+			"Unprocessed Request",
+			"Unable to read the content of the request. Possible bad formatting?",
 			HttpStatus.BAD_REQUEST
 		),
-		METHOD_ARGUMENT_NOT_VALID_TEMPLATE("Erro na Validação", null, HttpStatus.BAD_REQUEST),
-		MISSING_REQUEST_PARAMETER_TEMPLATE(
-			"Parâmetro de Solicitação Ausente",
+		METHOD_ARGUMENT_NOT_VALID("Validation Error", null, HttpStatus.BAD_REQUEST),
+		MISSING_REQUEST_PARAMETER(
+			"Missing Request Parameter",
 			null,
 			HttpStatus.BAD_REQUEST
 		),
-		MISSING_PATH_VARIABLE_TEMPLATE("Variável de Caminho Ausente", null, HttpStatus.BAD_REQUEST),
-		FORBIDDEN_TEMPLATE("Acesso Negado", "Permissões Insuficientes", HttpStatus.FORBIDDEN),
-		NOT_FOUND_TEMPLATE("Recurso Não Encontrado", null, HttpStatus.NOT_FOUND),
-		METHOD_NOT_ALLOWED_TEMPLATE(
-			"Método de Requisição Não Suportado",
+		MISSING_PATH_VARIABLE("Missing Path Variable", null, HttpStatus.BAD_REQUEST),
+		FORBIDDEN("Access Denied", "Insufficient Permissions.", HttpStatus.FORBIDDEN),
+		NOT_FOUND("Resource Not Found", null, HttpStatus.NOT_FOUND),
+		METHOD_NOT_ALLOWED(
+			"Unsupported Request Method",
 			null,
 			HttpStatus.METHOD_NOT_ALLOWED
 		),
-		NO_HANDLER_FOUND_TEMPLATE(
-			"Manipulador Não Encontrado",
-			"O endpoint solicitado não possui formas de processar a requisição",
+		NO_HANDLER_FOUND(
+			"Handler Not Found",
+			"The requested endpoint has no way to process the request.",
 			HttpStatus.NOT_FOUND
 		),
-		UNSUPPORTED_MEDIA_TYPE_TEMPLATE(
-			"Mídia Não Suportado",
+		UNSUPPORTED_MEDIA_TYPE(
+			"Unsupported Media-Type",
 			null,
 			HttpStatus.UNSUPPORTED_MEDIA_TYPE
 		),
-		INTERNAL_ERROR_TEMPLATE(
-			"Erro Interno do Servidor",
-			"Ocorreu um erro interno ao processar a solicitação.",
+		INTERNAL_ERROR(
+			"Internal Server Error",
+			"An internal error occurred while processing the request.",
 			HttpStatus.INTERNAL_SERVER_ERROR
 		),
-		HTTP_MESSAGE_NOT_WRITABLE_TEMPLATE(
-			"Erro na Escrita da Mensagem",
-			"Ocorreu um erro interno ao processar a solicitação",
+		HTTP_MESSAGE_NOT_WRITABLE(
+			"Error writing message",
+			"An internal error occurred while processing the request.",
 			HttpStatus.INTERNAL_SERVER_ERROR
 		);
 	}

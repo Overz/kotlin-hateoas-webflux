@@ -1,8 +1,8 @@
 package org.example.hateoas.utils
 
-import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.PositiveOrZero
+import org.example.hateoas.validations.annotations.LimitedNumber
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.data.domain.Sort.*
@@ -16,12 +16,11 @@ abstract class PaginationRequest(
 	@field:PositiveOrZero(message = "parâmetro precisa ser igual ou maior que zero")
 	var page: Int = PAGE_VALUE,
 
-	@field:Max(100)
-	@field:PositiveOrZero(message = "parâmetro precisa ser igual ou maior que zero")
+	@field:LimitedNumber(min = 0, max = 100)
 	var pageSize: Int = PAGE_SIZE_VALUE,
 
 	@field:Pattern(
-		message = "deve ser 'asc' ou 'desc' obrigatoriamente",
+		message = "deve ser 'asc' ou 'desc' obrigatoriamente, padrão '$DEFAULT_SORT_VALUE'",
 		regexp = "^\\w+:(asc|desc)(,\\w+:(asc|desc))*\$",
 		flags = [Pattern.Flag.CASE_INSENSITIVE]
 	)
@@ -36,14 +35,17 @@ abstract class PaginationRequest(
 	/**
 	 * jsonName:dbColumnName
 	 */
-	abstract fun getMappedFields(): Map<String, String>
-	abstract fun buildCriteria(): Criteria
-	abstract fun toQuery(withPagination: Boolean? = false): Query
+	abstract fun fields(): Map<String, String>
+	abstract fun criteria(): Criteria
+
+	fun toQuery(withPagination: Boolean? = false): Query =
+		if (withPagination == true) Query.query(criteria()).with(toPageRequest())
+		else Query.query(criteria())
 
 	fun toPageRequest() = PageRequest.of(page, pageSize, getSorters())
 
 	private fun getSorters(): Sort {
-		val fields = this.getMappedFields()
+		val fields = this.fields()
 		val orders = mutableListOf<Order>()
 
 		// field1:asc,field2:desc,...
@@ -51,8 +53,7 @@ abstract class PaginationRequest(
 			val (name, arg) = p.split(":")
 			if (fields.containsKey(name)) {
 				val direction = Direction.valueOf(arg.uppercase())
-				val order = Order(direction, fields.getValue(name))
-				orders.add(order)
+				orders.add(Order(direction, fields.getValue(name)))
 			}
 		}
 

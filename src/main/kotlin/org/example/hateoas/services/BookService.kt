@@ -1,14 +1,17 @@
-package org.example.hateoas
+package org.example.hateoas.services
 
+import org.example.hateoas.domain.Book
+import org.example.hateoas.domain.BookPagination
 import org.example.hateoas.errors.InternalServerException
 import org.example.hateoas.errors.NotFoundException
+import org.example.hateoas.repository.BookRepository
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 @Service
-class Service(private val repo: Repository, private val t: R2dbcEntityTemplate) {
+class BookService(private val repo: BookRepository, private val t: R2dbcEntityTemplate) {
 
 	fun create(b: Book) = repo.save(b)
 		.onErrorMap { InternalServerException(it) }
@@ -16,9 +19,7 @@ class Service(private val repo: Repository, private val t: R2dbcEntityTemplate) 
 	fun update(id: Int, b: Book) =
 		repo.findById(id)
 			.switchIfEmpty(Mono.error(NotFoundException("Nenhum item encontrado com id '$id'")))
-			.log()
 			.doOnError { throw InternalServerException("Erro ao resgatar ${Book.TABLE} com id '$id'") }
-			.log()
 			.flatMap {
 				repo.save(
 					Book(
@@ -31,10 +32,9 @@ class Service(private val repo: Repository, private val t: R2dbcEntityTemplate) 
 					)
 				)
 			}
-			.log()
 
 	fun get(id: Int) = repo.findById(id)
-		.doOnNext { if (it == null) throw NotFoundException("Não foi possível encontrar nenhum livro com id $id") }
+		.switchIfEmpty(Mono.error(NotFoundException("Não foi possível encontrar nenhum livro com id $id")))
 
 	fun delete(id: Int) = repo.deleteById(id)
 
